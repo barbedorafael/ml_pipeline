@@ -102,7 +102,7 @@ def stats(s1, s2):
             'rmse': rmse,
             'bias': bias}
 
-def model_run(df, selected_features, target, mlmodel, plot=False):
+def model_run(df, selected_features, target, mlmodel, plot=False, savefigs=False):
     """
     Tune hyperparameters, train and test a machine learning model.
 
@@ -112,6 +112,7 @@ def model_run(df, selected_features, target, mlmodel, plot=False):
     target (str): Name of the target variable.
     mlmodel (str): Machine learning model type ('MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF').
     plot (bool): If True, plot feature importance and observed vs predicted values.
+    savefigs (bool): If True, save figures plotted (plot must be True).
 
     Returns:
     dfe: DataFrame with specified columns, observed and predicted values, and errors.
@@ -206,6 +207,9 @@ def model_run(df, selected_features, target, mlmodel, plot=False):
         bias = stats_cv['bias'].round(2)
         rmse = stats_cv['rmse'].round(2)
         r2 = stats_cv['r2'].round(2)
+        
+        if savefigs:
+            fig.savefig('figures/permimp_'+target+'_'+mlmodel+'.png', dpi=300)
 
         # Observed vs Predicted Visualization
         fig, ax1 = plt.subplots(1, 1, dpi=300, figsize=(5, 5))
@@ -220,6 +224,9 @@ def model_run(df, selected_features, target, mlmodel, plot=False):
         ax1.set_aspect('equal', 'box')
         fig.tight_layout()
         plt.show()
+        
+        if savefigs:
+            fig.savefig('figures/result_'+target+'_'+mlmodel+'.png', dpi=300)
     
     
     return imps, stats_cv, dfe
