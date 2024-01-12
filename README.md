@@ -16,5 +16,19 @@ cluster_feature, selected_features = mlp.feature_selection(df, target, cluster_t
 
 # Chose ML model 
 mlmodel = 'SVM' # 'MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF'
-imps, stats_cv, dfe = mlp.model_run(df, selected_features, target, mlmodel, plot=True)
+y, result, imps = mlp.model_run(df,
+								selected_features,
+								target,
+								mlmodel,
+								method=method,
+								)
+
+# Plot results
+mlp.plot_results(result, y, imps, target, mlmodel, savefigs=True)
+
+# Creating the DataFrame with specified columns and errors
+dfe = pd.DataFrame(index=df.index)
+dfe[target + '_obs'] = y
+dfe[target + '_pred'] = result
+dfe[target + '_error'] = y - result
 ```
