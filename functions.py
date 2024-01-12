@@ -102,7 +102,33 @@ def stats(s1, s2):
             'rmse': rmse,
             'bias': bias}
 
-def model_run(df, selected_features, target, mlmodel, plot=False, savefigs=False):
+def train_test(X, y, train_index, test_index, grid, model):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    
+    randomSearch = RandomizedSearchCV(estimator=model,
+                                      n_jobs=-1,
+                                      n_iter=10,
+                                      cv=10,
+                                      param_distributions=grid,
+                                      scoring="r2")
+    searchResults = randomSearch.fit(X_train, y_train)
+
+    print('Best score: ' + str(randomSearch.best_score_))
+    print('Best params: ' + str(randomSearch.best_params_) + '\n')
+
+    model_opt = searchResults.best_estimator_
+    model_opt.fit(X_train, y_train)
+    yhat = model_opt.predict(X_test)
+
+    try:
+        r = permutation_importance(model_opt, X_test, y_test, n_repeats=10, random_state=0, scoring='r2')
+    except:
+        r = 0
+    
+    return yhat, r
+
+def model_run(df, selected_features, target, mlmodel, method='kfold'):
     """
     Tune hyperparameters, train and test a machine learning model.
 
@@ -111,16 +137,12 @@ def model_run(df, selected_features, target, mlmodel, plot=False, savefigs=False
     selected_features (list): The selected feature for model running.
     target (str): Name of the target variable.
     mlmodel (str): Machine learning model type ('MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF').
-    plot (bool): If True, plot feature importance and observed vs predicted values.
-    savefigs (bool): If True, save figures plotted (plot must be True).
 
     Returns:
     dfe: DataFrame with specified columns, observed and predicted values, and errors.
     """
-    # Prepare data
-    X = df[selected_features].values
-    X = MinMaxScaler().fit_transform(X)
-    y = df[target].values
+    print('\n Running ' + mlmodel + ' for ' + target + '\n')
+    start_time = time.time()
 
     # Model selection
     if mlmodel == 'MLR':
@@ -144,92 +166,82 @@ def model_run(df, selected_features, target, mlmodel, plot=False, savefigs=False
         grid = dict(n_estimators=randint(1, 500), max_leaf_nodes=randint(2, 100))
     else:
         raise ValueError('Please provide a valid ML model type!')
-
-    # 10-Fold Cross Validation
-    print('\n Running ' + mlmodel + ' for ' + target + '\n')
-    start_time = time.time()
     
-    n_splits = 10
-    cv = KFold(n_splits=n_splits)
-    result = np.zeros(y.size)
-    imps = pd.DataFrame(columns=selected_features, index=range(n_splits * 10))
-    i = 0
+    # Prepare data
+    X = df[selected_features].values
+    X = MinMaxScaler().fit_transform(X)
+    y = df[target].values
+    
+    ## 10-Fold Cross Validation
+    if method=='k-fold':
+        n_splits = 10
+        cv = KFold(n_splits=n_splits)
+        result = np.zeros(y.size)
+        imps = pd.DataFrame(columns=selected_features, index=range(n_splits * 10))
+        i = 0
+        for train_index, test_index in cv.split(X, y):
+            yhat, r = train_test(X, y, train_index, test_index, grid, model)
+            result[test_index] = yhat
+            imps.iloc[i:i+10, :] = r.importances.T
+            i += 10
+            processing = i + 100 / n_splits
+            print('Processing: {:.0f}%'.format(processing))
 
-    for train_index, test_index in cv.split(X, y):
-        X_train, X_test = X[train_index], X[test_index]
-        y_train, y_test = y[train_index], y[test_index]
-
-        randomSearch = RandomizedSearchCV(estimator=model, n_jobs=-1, n_iter=10, cv=10, param_distributions=grid, scoring="r2")
-        searchResults = randomSearch.fit(X_train, y_train)
-
-        print('Best score: ' + str(randomSearch.best_score_))
-        print('Best params: ' + str(randomSearch.best_params_) + '\n')
-
-        model_opt = searchResults.best_estimator_
-        model_opt.fit(X_train, y_train)
-        yhat = model_opt.predict(X_test)
-        result[test_index] = yhat
-
-        processing = i + 100 / n_splits
-        print('Processing: {:.0f}%'.format(processing))
-
-        r = permutation_importance(model_opt, X_test, y_test, n_repeats=10, random_state=0, scoring='r2')
-        imps.iloc[i:i+10, :] = r.importances.T
-        i += 10
+    elif method=='dataset':
+        train_index = df.has_data.values
+        test_index = [True] * train_index.size
+        
+        result, imps = train_test(X, y, train_index, test_index, grid, model)
+        
+    else:
+        return print('PROVIDE VALID METHOD')
 
     end_time = time.time()
     print('\n' + mlmodel + ' | Time to process: ' + str((end_time - start_time) / 60) + ' min \n')
+    
+    return y, result, imps
 
+def plot_results(result, y, imps, target, mlmodel, savefigs=False):
+    """    
+    plot (bool): If True, plot feature importance and observed vs predicted values.
+    savefigs (bool): If True, save figures plotted (plot must be True).
+    """
     # Compute statistic metrics of the cross validations
     stats_cv = stats(result, y)
     
-    # Calculate errors
-    error = y - result
+    # Feature Importance Visualization
+    imps_mean = imps.median()
+    imps_sortindex = imps_mean.argsort()[::-1]
 
-    # Creating the DataFrame with specified columns and errors
-    dfe = pd.DataFrame(index=df.index)
-    dfe[target + '_obs'] = y
-    dfe[target + '_pred'] = result
-    dfe[target + '_error'] = error
+    fig, ax = plt.subplots(1, 1, figsize=(6, 8))
+    ax.boxplot(imps.iloc[:, imps_sortindex[::-1][-12:]], vert=False, showfliers=False, labels=imps.columns[imps_sortindex[::-1][-12:]])
+    ax.set_title(f'{mlmodel}, {target}')
+    fig.tight_layout()
+    plt.show()
 
-    # Visualization of results
-    if plot:
-        # Feature Importance Visualization
-        imps_mean = imps.median()
-        imps_sortindex = imps_mean.argsort()[::-1]
-
-        fig, ax = plt.subplots(1, 1, figsize=(6, 8))
-        ax.boxplot(imps.iloc[:, imps_sortindex[::-1][-12:]], vert=False, showfliers=False, labels=imps.columns[imps_sortindex[::-1][-12:]])
-        ax.set_title(f'{mlmodel}, {target}')
-        fig.tight_layout()
-        plt.show()
-
-        bias = stats_cv['bias'].round(2)
-        rmse = stats_cv['rmse'].round(2)
-        r2 = stats_cv['r2'].round(2)
-        
-        if savefigs:
-            fig.savefig('figures/permimp_'+target+'_'+mlmodel+'.png', dpi=300)
-
-        # Observed vs Predicted Visualization
-        fig, ax1 = plt.subplots(1, 1, dpi=300, figsize=(5, 5))
-        ax1.scatter(y, result, s=5, alpha=0.5)
-        ax1.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
-        ax1.set_xlabel(f'Obs {target} [l/s]')
-        ax1.set_ylabel(f'Pred {target} [l/s]')
-        ax1.set_title(f'{mlmodel} \n BIAS: {bias:.2f}, RMSE: {rmse:.2f}, R²: {r2:.2f}')
-        cutlim = np.percentile(y, 99)
-        ax1.set_xlim([-1, cutlim])
-        ax1.set_ylim([-1, cutlim])
-        ax1.set_aspect('equal', 'box')
-        fig.tight_layout()
-        plt.show()
-        
-        if savefigs:
-            fig.savefig('figures/result_'+target+'_'+mlmodel+'.png', dpi=300)
+    bias = stats_cv['bias'].round(2)
+    rmse = stats_cv['rmse'].round(2)
+    r2 = stats_cv['r2'].round(2)
     
+    if savefigs:
+        fig.savefig('figures/permimp_'+target+'_'+mlmodel+'.png', dpi=300)
+
+    # Observed vs Predicted Visualization
+    fig, ax1 = plt.subplots(1, 1, dpi=300, figsize=(5, 5))
+    ax1.scatter(y, result, s=5, alpha=0.5)
+    ax1.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+    ax1.set_xlabel(f'Obs {target} [l/s]')
+    ax1.set_ylabel(f'Pred {target} [l/s]')
+    ax1.set_title(f'{mlmodel} \n BIAS: {bias:.2f}, RMSE: {rmse:.2f}, R²: {r2:.2f}')
+    cutlim = np.percentile(y, 99)
+    ax1.set_xlim([-1, cutlim])
+    ax1.set_ylim([-1, cutlim])
+    ax1.set_aspect('equal', 'box')
+    fig.tight_layout()
+    plt.show()
     
-    return imps, stats_cv, dfe
+    if savefigs:
+        fig.savefig('figures/result_'+target+'_'+mlmodel+'.png', dpi=300)
 
 
 
