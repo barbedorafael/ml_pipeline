@@ -12,9 +12,12 @@ from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
 from collections import defaultdict
 
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+from sklearn.decomposition import PCA
 from sklearn.model_selection import RandomizedSearchCV, KFold
 from sklearn.inspection import permutation_importance
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
@@ -25,7 +28,7 @@ from scipy.stats import randint, loguniform
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def feature_selection(df, target, cluster_threshold=0.4, plot=False):
+def fs_hcluster(df, features, target, cluster_threshold=0.4, plot=False):
     """
     Perform feature selection based on hierarchical clustering and correlation analysis.
 
@@ -40,7 +43,7 @@ def feature_selection(df, target, cluster_threshold=0.4, plot=False):
     """
     # Compute the correlation matrix
     dfcorr = df.corr(method='spearman')
-    corr = dfcorr.drop(['qm', 'q95'], axis=1).drop(['qm', 'q95'], axis=0).values
+    corr = dfcorr.loc[features, features].values
     corr = np.nan_to_num(corr)
 
     # Ensure the correlation matrix is symmetric
@@ -58,7 +61,7 @@ def feature_selection(df, target, cluster_threshold=0.4, plot=False):
     for idx, cluster_id in enumerate(cluster_ids):
         cluster_id_to_feature_ids[cluster_id].append(idx)
         cluster_feature['Cluster '+str(cluster_id)].append(df.columns[idx])
-
+        
     # Select features with the greatest correlation to the target
     selected_features = []
     for v in cluster_id_to_feature_ids.values():
@@ -91,6 +94,44 @@ def feature_selection(df, target, cluster_threshold=0.4, plot=False):
         plt.show()
     
     return cluster_feature, selected_features
+
+def pca_cluster_transform(df, cluster_feature):
+    
+    X = MinMaxScaler().fit_transform(df.values)
+    
+    pcs = {}
+    
+    for cluster, features in cluster_feature.items():
+        pca = PCA(n_components=1)  # Only the first principal component
+        pca.fit(X[:,features])
+        pcs[cluster] = pca.transform(X[:,features])
+        
+    feature_matrix = np.hstack([pcs[cluster] for cluster in sorted(pcs.keys())])
+    
+    return feature_matrix
+
+def calculate_vif(df, thresh=10):
+    Xv = StandardScaler().fit_transform(df.values) # FOR THE VIF
+    dfi = pd.DataFrame(Xv, columns = df.columns)
+    
+    variables = list(range(dfi.shape[1]))
+    dropped = True
+    while dropped:
+        dropped = False
+        vif = [variance_inflation_factor(dfi.iloc[:, variables].values, ix)
+                for ix in range(dfi.iloc[:, variables].shape[1])]
+        maxloc = vif.index(max(vif))
+        if max(vif) > thresh:
+            print('dropping \'' + dfi.iloc[:, variables].columns[maxloc] +
+                  '\' at index: ' + str(maxloc) + '| with value: ' + str(max(vif))
+                  )
+            del variables[maxloc]
+            dropped = True
+
+    print('Remaining variables:')
+    print(dfi.columns[variables])
+    
+    return dfi.columns[variables]
 
 def stats(s1, s2):
     rq75 = np.percentile(np.maximum(abs(s1/s2), abs(s2/s1)), 75)
@@ -128,7 +169,7 @@ def train_test(X, y, train_index, test_index, grid, model):
     
     return yhat, r
 
-def model_run(df, selected_features, target, mlmodel, method='kfold'):
+def model_run(X, y, mlmodel, method='kfold', has_data=None):
     """
     Tune hyperparameters, train and test a machine learning model.
 
@@ -141,7 +182,7 @@ def model_run(df, selected_features, target, mlmodel, method='kfold'):
     Returns:
     dfe: DataFrame with specified columns, observed and predicted values, and errors.
     """
-    print('\n Running ' + mlmodel + ' for ' + target + '\n')
+    print('\n Running ' + mlmodel + '\n')
     start_time = time.time()
 
     # Model selection
@@ -168,27 +209,26 @@ def model_run(df, selected_features, target, mlmodel, method='kfold'):
         raise ValueError('Please provide a valid ML model type!')
     
     # Prepare data
-    X = df[selected_features].values
     X = MinMaxScaler().fit_transform(X)
-    y = df[target].values
     
     ## 10-Fold Cross Validation
     if method=='k-fold':
         n_splits = 10
         cv = KFold(n_splits=n_splits)
         result = np.zeros(y.size)
-        imps = pd.DataFrame(columns=selected_features, index=range(n_splits * 10))
+        imps = pd.DataFrame(columns=range(1, X.shape[1]+1), index=range(n_splits * 10))
         i = 0
         for train_index, test_index in cv.split(X, y):
             yhat, r = train_test(X, y, train_index, test_index, grid, model)
             result[test_index] = yhat
             imps.iloc[i:i+10, :] = r.importances.T
-            i += 10
+            
             processing = i + 100 / n_splits
             print('Processing: {:.0f}%'.format(processing))
+            i += 10
 
     elif method=='dataset':
-        train_index = df.has_data.values
+        train_index = has_data
         test_index = [True] * train_index.size
         
         result, imps = train_test(X, y, train_index, test_index, grid, model)

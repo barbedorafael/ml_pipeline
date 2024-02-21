@@ -5,42 +5,54 @@ Created on Wed Nov 29 06:18:57 2023
 @author: RafBar
 """
 
-import pandas as pd
-import ml_pipeline as mlp
+import os
+os.chdir('ml_pipeline')
 
-df = pd.read_parquet('data/data4ml.parquet')
+import pandas as pd
+from src import functions as mlp
+
+
+df = pd.read_parquet('data/processed/data4ml_gauges.parquet')
 df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
 df = df.loc[:, ~(df==0).all(axis=0)]
 df = df.drop(['code', 'g_area', 'g_lat', 'g_lon'], axis=1)
+df = df.drop(['lat', 'lon', 'cocursodag', 'cobacia', 'nucomptrec', 'L'], axis=1)
 
 # Choose target (qm or q95)
 # target = 'q95' # q95 or qm
-targets = ['qm', 'q95']
+targets = ['qm', 'q95'] #, 'Wavg', 'Havg']
 models = ['MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF']
+features = df.columns.drop(targets)
 
 for target in targets:
-
+    # error = pd.read_parquet('results_'+target+'_'+mlmodel+'.parquet')
+    
     try:
-        df.has_data
+        has_data = df.has_data
         method = 'dataset'
-        selected_features = df.columns[:-3]
+        selected_features = features.drop('has_data')
     except:
+        has_data = None
         method = 'k-fold'
         # Select features for modelling based on hyerarchical clustering
-        cluster_feature, selected_features = mlp.feature_selection(df, target, cluster_threshold=0.4, plot=False)
-    
+        cluster_feature, selected_features = mlp.fs_hcluster(df,
+                                                             features, 
+                                                             target, 
+                                                             cluster_threshold=0.4, 
+                                                             plot=True)
+    X = df[selected_features].values
+    y = df[target].values
     
     for mlmodel in models:
         print('Running for ' + target + ' and ' + mlmodel)
-        error = pd.read_parquet('results_'+target+'_'+mlmodel+'.parquet')
-        
-        y, result, imps = mlp.model_run(df,
-                                        selected_features,
-                                        target,
+                
+        y, result, imps = mlp.model_run(X,
+                                        y,
                                         mlmodel,
                                         method=method,
+                                        has_data=has_data
                                         )
-        # mlp.plot_results(result, y, imps, target, mlmodel, savefigs=True)
+        mlp.plot_results(result, y, imps, target, mlmodel, savefigs=False)
         
         # Creating the DataFrame with specified columns and errors
         dfe = pd.DataFrame(index=df.index)

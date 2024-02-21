@@ -46,9 +46,9 @@ import pandas as pd
 
 # df = pd.read_parquet('data/subs_attributes_raw.parquet')
 
-df = pd.read_parquet('data/bho_data_agg.parquet')
+df = pd.read_parquet('data/interim/bho_data_agg.parquet')
 
-subs_new = pd.read_csv('fromMino/base_baciasinc_qinc_calc_sem_ons_sem_climadj.csv')
+subs_new = pd.read_csv('data/external/base_baciasinc_qinc_calc_sem_ons_sem_climadj.csv')
 
 df['has_data'] = df['code'].isin(subs_new['codigo']) #.dropna(subset=['qm', 'q95'])
 
@@ -68,7 +68,7 @@ df[['qm', 'q95']] = df[['qm', 'q95']].div(df['A'], axis=0)*1000
 
 del subs_new
 
-df = df.reset_index(drop=True)
+# df = df.reset_index(drop=True)
 
 # Function to aggregate monthly variable into monthly avg, min, max
 def agg_feat(strend, df_in=df):
@@ -108,14 +108,14 @@ del df_prec, df_temp, df_et, df_pet, df_terrain_simple
 # Save for ML model
 # =============================================================================
 # Remove identification features
-df = df.drop(['lat', 'lon', 'cocursodag', 'nucomptrec', 'L'], axis=1)
-df = df.sample(frac = 1).reset_index(drop=True) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
-df = df.set_index('cobacia')
+# df = df.drop(['lat', 'lon', 'cocursodag', 'nucomptrec', 'L'], axis=1)
+# df = df.sample(frac = 1).reset_index(drop=True) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
+# df = df.set_index('cobacia')
 
-df.to_parquet('data/data4ml_bho.parquet')
+df.to_parquet('data/processed/data4ml_bho.parquet')
 
 df_gauges = df[df.has_data].reset_index(drop=True).drop('has_data', axis=1) # Comment for whole dataset
-df_gauges.to_parquet('data/data4ml_gauges.parquet')
+df_gauges.to_parquet('data/processed/data4ml_gauges.parquet')
 
 
 
