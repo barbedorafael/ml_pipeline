@@ -23,6 +23,8 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.utils import resample
+
 from scipy.stats import randint, loguniform
 
 import matplotlib.pyplot as plt
@@ -133,15 +135,35 @@ def calculate_vif(df, thresh=10):
     
     return dfi.columns[variables]
 
-def stats(s1, s2):
-    rq75 = np.percentile(np.maximum(abs(s1/s2), abs(s2/s1)), 75)
-    r2 = 1 - ((s2-s1)**2).sum()/((s2-s2.mean())**2).sum() # == nash
-    rmse = ((s1 - s2) ** 2).mean() ** .5
-    bias = ((s1-s2).sum())/s2.sum() * 100
-    return {'rq75': rq75,
-            'r2': r2,
-            'rmse': rmse,
-            'bias': bias}
+def kfold_cv(X, y, model, grid):
+    """
+    Perform k-fold cross-validation on a given dataset using a specified model and parameter grid.
+
+    Parameters:
+    - X (pd.DataFrame or np.ndarray): Input features.
+    - y (pd.Series or np.ndarray): Target variable.
+    - model: Machine learning model to be trained.
+    - grid (dict): Hyperparameter grid for tuning the model.
+
+    Returns:
+    - result (pd.DataFrame): DataFrame with observed values, predicted values.
+    - imps (pd.DataFrame): DataFrame with feature importances.
+    """
+    n_splits = 10
+    cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)  # Ensure reproducibility
+    yhat = np.zeros(y.size)
+    imps = pd.DataFrame(columns=range(1, X.shape[1]+1), index=range(n_splits * 10))
+    i = 0
+    
+    for train_index, test_index in cv.split(X, y):
+        y_pred, r = train_test(X, y, train_index, test_index, grid, model)
+        yhat[test_index] = y_pred
+        imps.iloc[i:i+10, :] = r.importances.T
+        processing = (i // 10 + 1) * 100 / n_splits
+        print(f'Processing: {processing:.0f}%')
+        i += 10
+
+    return yhat, imps
 
 def train_test(X, y, train_index, test_index, grid, model):
     X_train, X_test = X[train_index], X[test_index]
@@ -149,25 +171,29 @@ def train_test(X, y, train_index, test_index, grid, model):
     
     randomSearch = RandomizedSearchCV(estimator=model,
                                       n_jobs=-1,
-                                      n_iter=10,
+                                      n_iter=100,
                                       cv=10,
                                       param_distributions=grid,
                                       scoring="r2")
     searchResults = randomSearch.fit(X_train, y_train)
-
+    
+    print('\n')
     print('Best score: ' + str(randomSearch.best_score_))
     print('Best params: ' + str(randomSearch.best_params_) + '\n')
-
+    
     model_opt = searchResults.best_estimator_
+    
     model_opt.fit(X_train, y_train)
-    yhat = model_opt.predict(X_test)
+    y_pred = model_opt.predict(X_test)
+    y_pred = np.maximum(y_pred, 0.001)
 
     try:
         r = permutation_importance(model_opt, X_test, y_test, n_repeats=10, random_state=0, scoring='r2')
     except:
         r = 0
     
-    return yhat, r
+    return y_pred, r
+
 
 def model_run(X, y, mlmodel, method='kfold', has_data=None):
     """
@@ -182,7 +208,6 @@ def model_run(X, y, mlmodel, method='kfold', has_data=None):
     Returns:
     dfe: DataFrame with specified columns, observed and predicted values, and errors.
     """
-    print('\n Running ' + mlmodel + '\n')
     start_time = time.time()
 
     # Model selection
@@ -213,41 +238,38 @@ def model_run(X, y, mlmodel, method='kfold', has_data=None):
     
     ## 10-Fold Cross Validation
     if method=='k-fold':
-        n_splits = 10
-        cv = KFold(n_splits=n_splits)
-        result = np.zeros(y.size)
-        imps = pd.DataFrame(columns=range(1, X.shape[1]+1), index=range(n_splits * 10))
-        i = 0
-        for train_index, test_index in cv.split(X, y):
-            yhat, r = train_test(X, y, train_index, test_index, grid, model)
-            result[test_index] = yhat
-            imps.iloc[i:i+10, :] = r.importances.T
-            
-            processing = i + 100 / n_splits
-            print('Processing: {:.0f}%'.format(processing))
-            i += 10
+        yhat, imps = kfold_cv(X, y, model, grid)
 
     elif method=='dataset':
         train_index = has_data
         test_index = [True] * train_index.size
-        
-        result, imps = train_test(X, y, train_index, test_index, grid, model)
-        
+        yhat, imps = train_test(X, y, train_index, test_index, grid, model)
     else:
         return print('PROVIDE VALID METHOD')
 
     end_time = time.time()
     print('\n' + mlmodel + ' | Time to process: ' + str((end_time - start_time) / 60) + ' min \n')
     
-    return y, result, imps
+    return yhat, imps
 
-def plot_results(result, y, imps, target, mlmodel, savefigs=False):
+def stats(s1, s2):
+    rq75 = np.percentile(np.maximum(abs(s1/s2), abs(s2/s1)), 75)
+    r2 = 1 - ((s2-s1)**2).sum()/((s2-s2.mean())**2).sum() # == nash
+    rmse = ((s1 - s2) ** 2).mean() ** .5
+    bias = ((s1-s2).sum())/s2.sum() * 100
+    return {'rq75': rq75,
+            'r2': r2,
+            'rmse': rmse,
+            'bias': bias}
+
+def plot_results(yobs, ypred, imps, target, mlmodel, savefigs=False):
     """    
     plot (bool): If True, plot feature importance and observed vs predicted values.
     savefigs (bool): If True, save figures plotted (plot must be True).
     """
+    
     # Compute statistic metrics of the cross validations
-    stats_cv = stats(result, y)
+    stats_cv = stats(ypred, yobs)
     
     # Feature Importance Visualization
     imps_mean = imps.median()
@@ -268,12 +290,12 @@ def plot_results(result, y, imps, target, mlmodel, savefigs=False):
 
     # Observed vs Predicted Visualization
     fig, ax1 = plt.subplots(1, 1, dpi=300, figsize=(5, 5))
-    ax1.scatter(y, result, s=5, alpha=0.5)
-    ax1.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+    ax1.scatter(yobs, ypred, s=5, alpha=0.5)
+    ax1.plot([yobs.min(), yobs.max()], [yobs.min(), yobs.max()], 'k--')
     ax1.set_xlabel(f'Obs {target} [l/s]')
     ax1.set_ylabel(f'Pred {target} [l/s]')
     ax1.set_title(f'{mlmodel} \n BIAS: {bias:.2f}, RMSE: {rmse:.2f}, R²: {r2:.2f}')
-    cutlim = np.percentile(y, 99)
+    cutlim = np.percentile(yobs, 99)
     ax1.set_xlim([-1, cutlim])
     ax1.set_ylim([-1, cutlim])
     ax1.set_aspect('equal', 'box')

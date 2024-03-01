@@ -5,9 +5,10 @@ Created on Wed Nov 29 06:18:57 2023
 @author: RafBar
 """
 
-import os
-os.chdir('ml_pipeline')
+# import os
+# os.chdir('ml_pipeline')
 
+import numpy as np
 import pandas as pd
 from src import functions as mlp
 
@@ -42,28 +43,33 @@ for target in targets:
                                                              plot=True)
     X = df[selected_features].values
     y = df[target].values
+    y = np.maximum(y, 0.001)
     
     for mlmodel in models:
         print('Running for ' + target + ' and ' + mlmodel)
                 
-        y, result, imps = mlp.model_run(X,
-                                        y,
-                                        mlmodel,
-                                        method=method,
-                                        has_data=has_data
-                                        )
-        mlp.plot_results(result, y, imps, target, mlmodel, savefigs=False)
+        yhat, imps = mlp.model_run(X,
+                                  y,
+                                  mlmodel,
+                                  method=method,
+                                  has_data=has_data
+                                  )
+        imps.columns = selected_features
         
         # Creating the DataFrame with specified columns and errors
-        dfe = pd.DataFrame(index=df.index)
-        dfe[target + '_obs'] = y
-        dfe[target + '_pred'] = result
+        dfr = pd.DataFrame(index=df.index)
+        dfr[target + '_obs'] = y
+        dfr[target + '_pred'] = yhat
         try:
-            dfe[target + '_error'] = y - result
+            dfr[target + '_error'] = y - yhat
         except:
             0
-        # imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
-        dfe.to_parquet('data/output/results_'+target+'_'+mlmodel+'_'+method+'.parquet')
+            
+        mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
+        
+        
+        imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
+        dfr.to_parquet('data/output/results_'+target+'_'+mlmodel+'_'+method+'.parquet')
         
     
 
