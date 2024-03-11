@@ -114,7 +114,7 @@ del df_prec, df_temp, df_et, df_pet, df_terrain_simple
 
 df.to_parquet('data/processed/data4ml_bho.parquet')
 
-df_gauges = df[df.has_data].reset_index(drop=True).drop('has_data', axis=1) # Comment for whole dataset
+df_gauges = df[df.has_data].drop('has_data', axis=1)
 df_gauges.to_parquet('data/processed/data4ml_gauges.parquet')
 
 

@@ -171,7 +171,7 @@ def train_test(X, y, train_index, test_index, grid, model):
     
     randomSearch = RandomizedSearchCV(estimator=model,
                                       n_jobs=-1,
-                                      n_iter=100,
+                                      n_iter=30,
                                       cv=10,
                                       param_distributions=grid,
                                       scoring="r2")
@@ -185,7 +185,6 @@ def train_test(X, y, train_index, test_index, grid, model):
     
     model_opt.fit(X_train, y_train)
     y_pred = model_opt.predict(X_test)
-    y_pred = np.maximum(y_pred, 0.001)
 
     try:
         r = permutation_importance(model_opt, X_test, y_test, n_repeats=10, random_state=0, scoring='r2')
@@ -262,7 +261,7 @@ def stats(s1, s2):
             'rmse': rmse,
             'bias': bias}
 
-def plot_results(yobs, ypred, imps, target, mlmodel, savefigs=False):
+def plot_results(yobs, ypred, imps, target, mlmodel, savefigs=False, folder='docs/figures/'):
     """    
     plot (bool): If True, plot feature importance and observed vs predicted values.
     savefigs (bool): If True, save figures plotted (plot must be True).
@@ -286,7 +285,7 @@ def plot_results(yobs, ypred, imps, target, mlmodel, savefigs=False):
     r2 = stats_cv['r2'].round(2)
     
     if savefigs:
-        fig.savefig('figures/permimp_'+target+'_'+mlmodel+'.png', dpi=300)
+        fig.savefig(folder+'permimp_'+target+'_'+mlmodel+'.png', dpi=300)
 
     # Observed vs Predicted Visualization
     fig, ax1 = plt.subplots(1, 1, dpi=300, figsize=(5, 5))
@@ -303,7 +302,7 @@ def plot_results(yobs, ypred, imps, target, mlmodel, savefigs=False):
     plt.show()
     
     if savefigs:
-        fig.savefig('figures/result_'+target+'_'+mlmodel+'.png', dpi=300)
+        fig.savefig(folder+'result_'+target+'_'+mlmodel+'.png', dpi=300)
 
 
 

@@ -14,10 +14,9 @@ from src import functions as mlp
 
 
 df = pd.read_parquet('data/processed/data4ml_gauges.parquet')
-df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
 df = df.loc[:, ~(df==0).all(axis=0)]
 df = df.drop(['code', 'g_area', 'g_lat', 'g_lon'], axis=1)
-df = df.drop(['lat', 'lon', 'cocursodag', 'cobacia', 'nucomptrec', 'L'], axis=1)
+df = df.drop(['cocursodag', 'cobacia', 'nucomptrec'], axis=1)
 
 # Choose target (qm or q95)
 # target = 'q95' # q95 or qm
@@ -25,6 +24,7 @@ targets = ['qm', 'q95'] #, 'Wavg', 'Havg']
 models = ['MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF']
 features = df.columns.drop(targets)
 
+df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
 for target in targets:
     # error = pd.read_parquet('results_'+target+'_'+mlmodel+'.parquet')
     
@@ -43,11 +43,11 @@ for target in targets:
                                                              plot=True)
     X = df[selected_features].values
     y = df[target].values
-    y = np.maximum(y, 0.001)
+    # y = np.maximum(y, 0.001) # No need because smallest value is 0.075
     
     for mlmodel in models:
         print('Running for ' + target + ' and ' + mlmodel)
-                
+        # y = np.log1p(y)
         yhat, imps = mlp.model_run(X,
                                   y,
                                   mlmodel,
@@ -56,20 +56,18 @@ for target in targets:
                                   )
         imps.columns = selected_features
         
+        # y = np.expm1(y)
+        # yhat = np.expm1(yhat)
+        
         # Creating the DataFrame with specified columns and errors
         dfr = pd.DataFrame(index=df.index)
-        dfr[target + '_obs'] = y
-        dfr[target + '_pred'] = yhat
-        try:
-            dfr[target + '_error'] = y - yhat
-        except:
-            0
-            
-        mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
-        
-        
+        dfr['obs'] = y
+        dfr['pred'] = yhat
+
         imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
-        dfr.to_parquet('data/output/results_'+target+'_'+mlmodel+'_'+method+'.parquet')
+        dfr.to_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_'+method+'.parquet')
+        
+        mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=True)
         
     
 
