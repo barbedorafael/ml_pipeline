@@ -13,7 +13,7 @@ import pandas as pd
 from src import functions as mlp
 
 
-df = pd.read_parquet('data/processed/data4ml_gauges.parquet')
+df = pd.read_parquet('data/processed/data4ml_bho.parquet')
 df = df.loc[:, ~(df==0).all(axis=0)]
 df = df.drop(['code', 'g_area', 'g_lat', 'g_lon'], axis=1)
 df = df.drop(['cocursodag', 'cobacia', 'nucomptrec'], axis=1)
@@ -26,14 +26,11 @@ features = df.columns.drop(targets)
 
 df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
 for target in targets:
-    # error = pd.read_parquet('results_'+target+'_'+mlmodel+'.parquet')
-    
     try:
-        has_data = df.has_data
+        df[target].isna().any()
         method = 'dataset'
-        selected_features = features.drop('has_data')
+        selected_features = features
     except:
-        has_data = None
         method = 'k-fold'
         # Select features for modelling based on hyerarchical clustering
         cluster_feature, selected_features = mlp.fs_hcluster(df,
@@ -52,22 +49,23 @@ for target in targets:
                                   y,
                                   mlmodel,
                                   method=method,
-                                  has_data=has_data
                                   )
-        imps.columns = selected_features
         
-        # y = np.expm1(y)
-        # yhat = np.expm1(yhat)
+        try:
+            imps.columns = selected_features
+            imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
+            mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=True)
+        except:
+            0
         
         # Creating the DataFrame with specified columns and errors
         dfr = pd.DataFrame(index=df.index)
         dfr['obs'] = y
         dfr['pred'] = yhat
 
-        imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
         dfr.to_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_'+method+'.parquet')
         
-        mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=True)
+        
         
     
 

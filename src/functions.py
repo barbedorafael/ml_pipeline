@@ -194,7 +194,7 @@ def train_test(X, y, train_index, test_index, grid, model):
     return y_pred, r
 
 
-def model_run(X, y, mlmodel, method='kfold', has_data=None):
+def model_run(X, y, mlmodel, method='kfold'):
     """
     Tune hyperparameters, train and test a machine learning model.
 
@@ -240,7 +240,7 @@ def model_run(X, y, mlmodel, method='kfold', has_data=None):
         yhat, imps = kfold_cv(X, y, model, grid)
 
     elif method=='dataset':
-        train_index = has_data
+        train_index = ~np.isnan(y)
         test_index = [True] * train_index.size
         yhat, imps = train_test(X, y, train_index, test_index, grid, model)
     else:

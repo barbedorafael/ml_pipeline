@@ -4,7 +4,7 @@ Created on Thu Sep 21 09:54:40 2023
 
 @author: RafBar
 """
-
+import numpy as np
 import pandas as pd
 
 # values_wavg = ['elv_avg', 'slp_avg', 'hnd_avg',
@@ -50,7 +50,8 @@ df = pd.read_parquet('data/interim/bho_data_agg.parquet')
 
 subs_new = pd.read_csv('data/external/base_baciasinc_qinc_calc_sem_ons_sem_climadj.csv')
 
-df['has_data'] = df['code'].isin(subs_new['codigo']) #.dropna(subset=['qm', 'q95'])
+has_data = df['code'].isin(subs_new['codigo']) #.dropna(subset=['qm', 'q95'])
+df.loc[~has_data, ['code', 'qm', 'q95']] = [0, np.nan, np.nan]
 
 # qm and q95 at the end
 cols = list(df.columns)
@@ -114,7 +115,7 @@ del df_prec, df_temp, df_et, df_pet, df_terrain_simple
 
 df.to_parquet('data/processed/data4ml_bho.parquet')
 
-df_gauges = df[df.has_data].drop('has_data', axis=1)
+df_gauges = df[df.has_data]
 df_gauges.to_parquet('data/processed/data4ml_gauges.parquet')
 
 
