@@ -44,7 +44,7 @@ def fs_hcluster(df, features, target, cluster_threshold=0.4, plot=False):
     selected_features (list): The selected feature for model running.
     """
     # Compute the correlation matrix
-    dfcorr = df.corr(method='spearman')
+    dfcorr = df.corr(method='spearman').abs()
     corr = dfcorr.loc[features, features].values
     corr = np.nan_to_num(corr)
 
@@ -295,8 +295,8 @@ def plot_results(yobs, ypred, imps, target, mlmodel, savefigs=False, folder='doc
     ax1.set_ylabel(f'Pred {target} [l/s]')
     ax1.set_title(f'{mlmodel} \n BIAS: {bias:.2f}, RMSE: {rmse:.2f}, R²: {r2:.2f}')
     cutlim = np.percentile(yobs, 99)
-    ax1.set_xlim([-1, cutlim])
-    ax1.set_ylim([-1, cutlim])
+    ax1.set_xlim([0, cutlim])
+    ax1.set_ylim([0, cutlim])
     ax1.set_aspect('equal', 'box')
     fig.tight_layout()
     plt.show()

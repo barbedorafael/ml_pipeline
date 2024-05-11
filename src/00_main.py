@@ -13,24 +13,22 @@ import pandas as pd
 from src import functions as mlp
 
 
-df = pd.read_parquet('data/processed/data4ml_bho.parquet')
+df = pd.read_parquet('data/processed/data4ml_bho.parquet') # gauges or bho
 df = df.loc[:, ~(df==0).all(axis=0)]
 df = df.drop(['code', 'g_area', 'g_lat', 'g_lon'], axis=1)
 df = df.drop(['cocursodag', 'cobacia', 'nucomptrec'], axis=1)
 
-# Choose target (qm or q95)
-# target = 'q95' # q95 or qm
-targets = ['qm', 'q95'] #, 'Wavg', 'Havg']
+# Choose target
+targets = ['qm', 'q95'] # ['Wavg', 'Havg'] #
 models = ['MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF']
 features = df.columns.drop(targets)
 
 df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
 for target in targets:
-    try:
-        df[target].isna().any()
+    if df[target].isna().any():
         method = 'dataset'
         selected_features = features
-    except:
+    else:
         method = 'k-fold'
         # Select features for modelling based on hyerarchical clustering
         cluster_feature, selected_features = mlp.fs_hcluster(df,
@@ -54,7 +52,7 @@ for target in targets:
         try:
             imps.columns = selected_features
             imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
-            mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=True)
+            mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
         except:
             0
         

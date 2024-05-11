@@ -50,7 +50,7 @@ import pandas as pd
 import geopandas as gpd
 import ast
 
-subs = gpd.read_parquet('data/input/bho_flow_data.parquet')
+subs = gpd.read_parquet('data/raw/bho_flow_data.parquet')
 subs = subs.sort_values(by='cotrecho', ignore_index=True)
 
 centroids = subs.geometry.representative_point()
@@ -64,11 +64,11 @@ def open_attribute_data(file):
     df = df.drop(['.geo'], axis=1)
     return df
 
-att_cli = open_attribute_data('data/input/bho_attributes_climate.csv')
-att_soil = open_attribute_data('data/input/bho_attributes_soilcontent.csv')
-att_texlit = open_attribute_data('data/input/bho_attributes_textlito.csv')
-att_topolc = open_attribute_data('data/input/bho_attributes_topolc.csv')
-att_ws = open_attribute_data('data/input/bho_attributes_ws.csv')
+att_cli = open_attribute_data('data/raw/bho_attributes_climate.csv')
+att_soil = open_attribute_data('data/raw/bho_attributes_soilcontent.csv')
+att_texlit = open_attribute_data('data/raw/bho_attributes_textlito.csv')
+att_topolc = open_attribute_data('data/raw/bho_attributes_topolc.csv')
+att_ws = open_attribute_data('data/raw/bho_attributes_ws.csv')
 
 att = pd.concat([att_cli, att_soil, att_texlit, att_topolc, att_ws], axis=1)
 att = att.loc[:,~att.columns.duplicated(keep='last')]
@@ -197,7 +197,7 @@ import time
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
-df = pd.read_parquet('data/bho_data_unit.parquet')#, engine='pyarrow', dtype_backend='pyarrow')
+df = pd.read_parquet('data/interim/bho_data_unit.parquet')#, engine='pyarrow', dtype_backend='pyarrow')
 df = df.sort_values(by='cobacia', ascending=False) # sort by otto code to speed up computations
 df = df.set_index('cotrecho')
 n = len(df)
@@ -277,7 +277,7 @@ print('Time to process: ' + str(((end_time - start_time)/60)) + ' min')
 check_areas = df[['A', 'nuareamont', 'nuareacont', 'cobacia']]
 df = df.drop(['A', 'nutrjus', 'nuareacont'], axis=1)
 
-df.to_parquet('data/bho_data_agg.parquet')
+df.to_parquet('data/interim/bho_data_agg.parquet')
 
 
 
