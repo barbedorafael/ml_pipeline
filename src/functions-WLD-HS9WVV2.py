@@ -16,7 +16,7 @@ from collections import defaultdict
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from sklearn.decomposition import PCA
-from sklearn.model_selection import RandomizedSearchCV, KFold, LeaveOneOut
+from sklearn.model_selection import RandomizedSearchCV, KFold
 from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.linear_model import LinearRegression
@@ -31,7 +31,7 @@ from scipy.stats import randint, loguniform
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def fs_hcluster(df, features, target, cluster_threshold, plot=False):
+def fs_hcluster(df, features, target, cluster_threshold=0.25, plot=False):
     """
     Perform feature selection based on hierarchical clustering and correlation analysis.
 
@@ -44,6 +44,7 @@ def fs_hcluster(df, features, target, cluster_threshold, plot=False):
     cluster_feature (dict): Dictionaire containing the cluster with their respective features.
     selected_features (list): The selected feature for model running.
     """
+    
     # Compute the correlation matrix
     dfcorr = df.corr(method='spearman').abs()
     corr = dfcorr.loc[features, features].values
@@ -58,7 +59,7 @@ def fs_hcluster(df, features, target, cluster_threshold, plot=False):
     dist_linkage = hierarchy.linkage(squareform(distance_matrix), method='single')
 
     # Hierarchical clustering
-    cluster_ids = hierarchy.fcluster(dist_linkage, cluster_threshold, criterion="distance")
+    cluster_ids = hierarchy.fcluster(dist_linkage, t=cluster_threshold, criterion="distance")
     cluster_id_to_feature_ids = defaultdict(list)
     cluster_feature = defaultdict(list)
     for idx, cluster_id in enumerate(cluster_ids):
@@ -71,7 +72,11 @@ def fs_hcluster(df, features, target, cluster_threshold, plot=False):
         targetcorr = dfcorr[target].iloc[v].max()
         bestfeat = dfcorr.reset_index().index[dfcorr[target] == targetcorr].values[0]
         selected_features.append(df.columns[bestfeat])
-        
+    
+    # Multicolinearity of left features
+    flatcorr = dfcorr.loc[selected_features, selected_features].values.flatten()
+    flatcorr[flatcorr<1].max()
+    
     # Plot the correlation matrix and the dendogram
     if plot:
         fig, ax = plt.subplots(1, 1, figsize=(6,6), dpi=300)
@@ -147,57 +152,26 @@ def kfold_cv(X, y, model, grid):
     - grid (dict): Hyperparameter grid for tuning the model.
 
     Returns:
-    - result (pd.DataFrame): DataFrame with observed values, predicted values.
-    - imps (pd.DataFrame): DataFrame with feature importances.
+    - yhat (np.ndarray): predicted values.
+    - imps (np.ndarray): feature importances.
     """
     n_splits = 10
-    n_repeats = 10
     cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)  # Ensure reproducibility
     yhat = np.zeros(y.size)
-    imps = pd.DataFrame(columns=range(1, X.shape[1]+1), index=range(n_splits * n_repeats))
+    imps = pd.DataFrame(columns=range(1, X.shape[1]+1), index=range(n_splits * 10))
     i = 0
     
     for train_index, test_index in cv.split(X, y):
-        y_pred, r = train_test(X, y, train_index, test_index, grid, model, n_repeats)
+        y_pred, r = train_test(X, y, train_index, test_index, grid, model)
         yhat[test_index] = y_pred
-        imps.iloc[i:i+n_repeats, :] = r.importances.T
-        processing = (i // n_repeats + 1) * 100 / n_splits
+        imps.iloc[i:i+10, :] = r.importances.T
+        processing = (i // 10 + 1) * 100 / n_splits
         print(f'Processing: {processing:.0f}%')
-        i += n_repeats
+        i += 10
 
     return yhat, imps
 
-def loo_cv(X, y, model, grid):
-    """
-    Perform leave-one-out cross-validation on a given dataset using a specified model and parameter grid.
-
-    Parameters:
-    - X (pd.DataFrame or np.ndarray): Input features.
-    - y (pd.Series or np.ndarray): Target variable.
-    - model: Machine learning model to be trained.
-    - grid (dict): Hyperparameter grid for tuning the model.
-
-    Returns:
-    - result (pd.DataFrame): DataFrame with observed values, predicted values.
-    - imps (pd.DataFrame): DataFrame with feature importances.
-    """
-    n_repeats=10
-    cv = LeaveOneOut()
-    yhat = np.zeros(y.size)
-    imps = pd.DataFrame(columns=range(1, X.shape[1]+1), index=range(10))
-    i = 0
-    
-    for train_index, test_index in cv.split(X, y):
-        y_pred, r = train_test(X, y, train_index, test_index, grid, model, n_repeats)
-        yhat[test_index] = y_pred
-        imps.iloc[i:i+n_repeats, :] = r.importances.T
-        processing = (i // n_repeats + 1) * 100 / y.size
-        print(f'Processing: {processing:.0f}%')
-        i += n_repeats
-
-    return yhat, imps
-
-def train_test(X, y, train_index, test_index, grid, model, n_repeats):
+def train_test(X, y, train_index, test_index, grid, model):
     X_train, X_test = X[train_index], X[test_index]
     y_train, y_test = y[train_index], y[test_index]
     
@@ -215,29 +189,24 @@ def train_test(X, y, train_index, test_index, grid, model, n_repeats):
     
     model_opt = searchResults.best_estimator_
     
+    # try:
+    #     print(model_opt.coef_)
+    # except:
+    #     0
+    
     model_opt.fit(X_train, y_train)
     y_pred = model_opt.predict(X_test)
 
     try:
-        r = permutation_importance(model_opt, X_test, y_test, n_repeats=n_repeats, random_state=42, scoring='r2')
+        r = permutation_importance(model_opt, X_test, y_test, n_repeats=10)
     except:
         r = 0
     
     return y_pred, r
 
+
 def model_run(X, y, mlmodel, method='kfold'):
-    """
-    Tune hyperparameters, train and test a machine learning model.
-
-    Parameters:
-    df (pd.DataFrame): DataFrame containing the features and target.
-    selected_features (list): The selected feature for model running.
-    target (str): Name of the target variable.
-    mlmodel (str): Machine learning model type ('MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF').
-
-    Returns:
-    dfe: DataFrame with specified columns, observed and predicted values, and errors.
-    """
+    
     start_time = time.time()
 
     # Model selection
@@ -269,8 +238,7 @@ def model_run(X, y, mlmodel, method='kfold'):
     ## 10-Fold Cross Validation
     if method=='k-fold':
         yhat, imps = kfold_cv(X, y, model, grid)
-    elif method=='loo':
-        yhat, imps = loo_cv(X, y, model, grid)
+
     elif method=='dataset':
         train_index = ~np.isnan(y)
         test_index = [True] * train_index.size

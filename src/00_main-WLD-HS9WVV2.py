@@ -31,13 +31,12 @@ for target in targets:
         selected_features = features
     else:
         method = 'k-fold'
-        # method = 'loo'
         # Select features for modelling based on hyerarchical clustering
         cluster_feature, selected_features = mlp.fs_hcluster(df,
                                                              features, 
                                                              target, 
                                                              cluster_threshold=0.25, 
-                                                             plot=True)
+                                                             plot=False)
     X = df[selected_features].values
     y = df[target].values
     # y = np.maximum(y, 0.001) # No need because smallest value is 0.075

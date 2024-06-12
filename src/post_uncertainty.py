@@ -25,10 +25,7 @@ bho = bho.set_index('cotrecho', drop=False).sort_index()
 
 # Choose targets
 targets = ['qm', 'q95'] # ['Wavg', 'Havg'] # 
-models = ['MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF'] # ['RF'] # 
-
-def model(x, b, a):
-    return a*x + b
+models = ['SVM', 'GBM', 'RF'] # ['RF'] # 
 
 for target in targets:
     for mlmodel in models:
@@ -46,9 +43,11 @@ for target in targets:
         yhat = dfr['pred'].values
         
 
-        mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=True)
+        mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
         
         dfr['error'] = y - yhat
+        dfr['error_rel'] = dfr.error / dfr.pred
+        dfr[['lat', 'lon']] = df[['g_lat', 'g_lon']]
         
         dfcorrx = df.corrwith(abs(dfr.error), method='spearman')
         dfcorry = dfr.corrwith(abs(dfr.error), method='spearman')
@@ -70,6 +69,7 @@ for target in targets:
             lower = upper
             
         e_range['upper_limit'] = quantiles
+        e_range.index.name = 'quantile'
         xdata = e_range.upper_limit.rolling(2).mean()
         xdata.iloc[0] = e_range.upper_limit.iloc[0] / 2
         xdata = xdata.values
@@ -80,6 +80,8 @@ for target in targets:
         for n, qd in enumerate([0.05, 0.95, 0.125, 0.875]):
             quantile_model = smf.quantreg('error ~ pred', dfr).fit(q=qd)
             params.iloc[:,n] = quantile_model.params
+        params.index = ['intercept', 'gradient']
+        params.index.name = 'parameters'
         
         xx = np.linspace(dfr.pred.min() / 10, dfr.pred.max() * 1.2, 1000)
         plt.scatter(dfr.pred, dfr.error, s=15, alpha=0.1, label='Data Points')
@@ -94,37 +96,45 @@ for target in targets:
             ydata_noisy = e_range.iloc[:, n].values
             plt.scatter(xdata, ydata_noisy)
         
-        plt.xlim([0, dfr.pred.quantile(0.95)])
-        plt.ylim([dfr.error.quantile(0.05), dfr.error.quantile(0.95)])
+        plt.xlim([0, dfr.pred.quantile(0.99)])
+        plt.ylim([dfr.error.quantile(0.01), dfr.error.quantile(0.99)])
         # plt.ylim([-1, 2.5])
         # plt.ylim([dfr.error.quantile(0.1), dfr.error.max()])
         plt.title(mlmodel + ' ' + target)
         # plt.legend()
         plt.show()
         
+        # post-processed results
+        dfr.to_csv('data/output/results_post_'+target+'_'+mlmodel+'_k-fold.csv')
         
-        bho_r = pd.read_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_dataset.parquet')
-        bho_r.loc[dfr.index, 'pred'] = dfr.pred # Replace training predictions with k-fold predictions
+        # empiric uncertainty bands
+        e_range.to_csv('data/output/empiric_uncertainty_'+target+'_'+mlmodel+'.csv')
         
-        dataset = bho[['cotrecho', 'nuareamont']]
-        dataset['pred'] = bho_r.pred
+        # parameters of quantile regression
+        params.to_csv('data/output/parameters_uncertainty_'+target+'_'+mlmodel+'.csv')
         
-        dataset['pred'] = dataset.pred * dataset.nuareamont / 1000
+        # bho_r = pd.read_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_dataset.parquet')
+        # # bho_r.loc[dfr.index, 'pred'] = dfr.pred # Replace training predictions with k-fold predictions
         
-        # Iterate through each column in the original DataFrame
-        for column in params.columns:
-            a = params.iloc[-1][column]
-            b = params.iloc[0][column]
+        # dataset = bho[['cotrecho', 'nuareamont']]
+        # dataset['pred'] = bho_r.pred
+        
+        # # dataset['pred'] = dataset.pred * dataset.nuareamont / 1000
+        
+        # # Iterate through each column in the original DataFrame
+        # for column in params.columns:
+        #     a = params.iloc[-1][column]
+        #     b = params.iloc[0][column]
             
-            # Apply the calculation a*x + b
-            dataset[column] = dataset.pred * (1 + a) + b
+        #     # Apply the calculation a*x + b
+        #     dataset[column] = dataset.pred * (1 + a) + b
         
-        dataset[dataset<0] = 0
-        dataset['gauged'] = dataset.index.isin(dfr.index)
+        # dataset[dataset<0] = 0
+        # dataset['gauged'] = dataset.index.isin(dfr.index)
         
-        dataset = dataset.set_geometry(bho.geometry)
+        # dataset = dataset.set_geometry(bho.geometry)
         
-        dataset.to_parquet('data/output/bho_'+target+'_'+mlmodel+'.parquet')
+        # dataset.to_parquet('data/output/bho_'+target+'_'+mlmodel+'.parquet')
 
 
 
