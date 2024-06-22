@@ -19,12 +19,14 @@ df = df.drop(['code', 'g_area', 'g_lat', 'g_lon'], axis=1)
 df = df.drop(['cocursodag', 'cobacia', 'nucomptrec'], axis=1)
 df = df.drop(['lat', 'lon', 'L'], axis=1)
 
+mlp.plot_correlation_matrix(df)
+
 # Choose target
 targets = ['qm', 'q95'] # ['Wavg', 'Havg'] #
 models = ['MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF']
 features = df.columns.drop(targets)
 
-df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
+df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKWK
 for target in targets:
     if df[target].isna().any():
         method = 'dataset'
@@ -54,7 +56,7 @@ for target in targets:
         try:
             imps.columns = selected_features
             imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
-            mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
+            # mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
         except:
             0
         
@@ -63,7 +65,7 @@ for target in targets:
         dfr['obs'] = y
         dfr['pred'] = yhat
 
-        dfr.to_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_'+method+'.parquet')
+        # dfr.to_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_'+method+'.parquet')
         
         
         

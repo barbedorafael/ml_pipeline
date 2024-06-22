@@ -31,6 +31,50 @@ from scipy.stats import randint, loguniform
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
+def plot_correlation_matrix(data, title='Correlation Matrix', figsize=(15, 12)):
+    """
+    Plots a heatmap of the correlation matrix with sizes proportional to the correlation values.
+    
+    Parameters:
+    data (pd.DataFrame): The input dataframe containing the data.
+    title (str): The title of the plot.
+    figsize (tuple): The size of the figure.
+    
+    Returns:
+    None
+    """
+    
+    # Compute the correlation matrix
+    corr = data.corr()
+    
+    # Create a mask for the upper triangle
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+
+    # Initialize the matplotlib figure
+    f, ax = plt.subplots(figsize=figsize, dpi=300)
+
+    # Generate a custom diverging colormap
+    cmap = sns.diverging_palette(20, 220, as_cmap=True)
+
+    # Draw the heatmap with the mask and correct aspect ratio
+    sns.heatmap(corr, mask=mask, cmap=cmap, vmin=-0.75, vmax=0.75, center=0,
+                square=True, linewidths=.3, annot=False, cbar_kws={"shrink": .5})
+
+    # Add the sizes proportional to the correlation values
+    # for y in range(corr.shape[0]):
+    #     for x in range(y + 1, corr.shape[1]):
+    #         size = abs(corr.iloc[y, x]) * 1000  # Adjust size scaling factor as needed
+    #         plt.scatter(x + 0.5, y + 0.5, s=size, alpha=0.5, c='black', edgecolors='w', lw=0.5)
+
+    # Add title and labels
+    plt.title(title, size=15)
+    plt.xticks(ticks=np.arange(len(corr.columns)) + 0.5, labels=corr.columns, rotation=90)
+    plt.yticks(ticks=np.arange(len(corr.index)) + 0.5, labels=corr.index, rotation=0)
+
+    plt.tight_layout()
+    plt.show()
+
 def fs_hcluster(df, features, target, cluster_threshold, plot=False):
     """
     Perform feature selection based on hierarchical clustering and correlation analysis.
@@ -82,17 +126,12 @@ def fs_hcluster(df, features, target, cluster_threshold, plot=False):
         fig.tight_layout()
         plt.show()
         
-        fig, ax = plt.subplots(1, 1, figsize=(9,9), dpi=300)
+        fig, ax = plt.subplots(1, 1, figsize=(12,12), dpi=300)
         ax.imshow(corr[dendro["leaves"], :][:, dendro["leaves"]])
         ax.set_xticks(dendro_idx)
         ax.set_yticks(dendro_idx)
         ax.set_xticklabels(dendro["ivl"], rotation="vertical")
         ax.set_yticklabels(dendro["ivl"])
-        fig.tight_layout()
-        plt.show()
-        
-        fig, ax = plt.subplots(1, 1, figsize=(15,12), dpi=300)
-        sns.heatmap(abs(dfcorr), ax=ax, cmap='flare')
         fig.tight_layout()
         plt.show()
     
