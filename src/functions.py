@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def plot_correlation_matrix(data, title='Correlation Matrix', figsize=(15, 12)):
+def plot_correlation_matrix(data, savefig=False):
     """
     Plots a heatmap of the correlation matrix with sizes proportional to the correlation values.
     
@@ -52,7 +52,7 @@ def plot_correlation_matrix(data, title='Correlation Matrix', figsize=(15, 12)):
     mask = np.triu(np.ones_like(corr, dtype=bool))
 
     # Initialize the matplotlib figure
-    f, ax = plt.subplots(figsize=figsize, dpi=300)
+    f, ax = plt.subplots(figsize=(15, 12), dpi=300)
 
     # Generate a custom diverging colormap
     cmap = sns.diverging_palette(20, 220, as_cmap=True)
@@ -68,12 +68,15 @@ def plot_correlation_matrix(data, title='Correlation Matrix', figsize=(15, 12)):
     #         plt.scatter(x + 0.5, y + 0.5, s=size, alpha=0.5, c='black', edgecolors='w', lw=0.5)
 
     # Add title and labels
-    plt.title(title, size=15)
+    # plt.title(title, size=15)
     plt.xticks(ticks=np.arange(len(corr.columns)) + 0.5, labels=corr.columns, rotation=90)
     plt.yticks(ticks=np.arange(len(corr.index)) + 0.5, labels=corr.index, rotation=0)
 
     plt.tight_layout()
     plt.show()
+    
+    if savefig:
+        f.savefig('docs/figures/correlation_matrix_all.png', dpi=300)
 
 def fs_hcluster(df, features, target, cluster_threshold, plot=False):
     """
@@ -89,7 +92,7 @@ def fs_hcluster(df, features, target, cluster_threshold, plot=False):
     selected_features (list): The selected feature for model running.
     """
     # Compute the correlation matrix
-    dfcorr = df.corr(method='spearman').abs()
+    dfcorr = df.corr(method='spearman')
     corr = dfcorr.loc[features, features].values
     corr = np.nan_to_num(corr)
 
@@ -118,18 +121,43 @@ def fs_hcluster(df, features, target, cluster_threshold, plot=False):
         
     # Plot the correlation matrix and the dendogram
     if plot:
-        fig, ax = plt.subplots(1, 1, figsize=(6,6), dpi=300)
+        
+        fig, ax = plt.subplots(1, 1, figsize=(8,8), dpi=300)
         dendro = hierarchy.dendrogram(
-            dist_linkage, labels=df.iloc[:,:-2].columns.tolist(), ax=ax, leaf_rotation=90
-        )
-        dendro_idx = np.arange(0, len(dendro["ivl"]))
+            dist_linkage,
+            labels=df[features].columns.tolist(),
+            color_threshold=cluster_threshold,
+            above_threshold_color='gray',
+            ax=ax,
+            leaf_rotation=90
+            )
+        # dendro_idx = np.arange(0, len(dendro["ivl"]))
+        leaf_colors = {}
+        for color, leaf in zip(dendro['leaves_color_list'], dendro['leaves']):
+            leaf_colors[leaf] = color
+                
+        # Apply the custom colors to the tick labels
+        ax = plt.gca()
+        x_labels = ax.get_xmajorticklabels()
+        
+        for i, label in zip(dendro['leaves'], x_labels):
+            label_text = label.get_text()
+            label.set_color(leaf_colors[i])
+        
+        ax.axhline(y=cluster_threshold, color='black', linestyle='--', label=f'Cluster Threshold')
         fig.tight_layout()
         plt.show()
         
-        fig, ax = plt.subplots(1, 1, figsize=(12,12), dpi=300)
-        ax.imshow(corr[dendro["leaves"], :][:, dendro["leaves"]])
-        ax.set_xticks(dendro_idx)
-        ax.set_yticks(dendro_idx)
+        fig, ax = plt.subplots(1, 1, figsize=(15,12), dpi=300)
+        # ax.imshow(corr[dendro["leaves"], :][:, dendro["leaves"]])
+        sns.heatmap(corr[dendro["leaves"], :][:, dendro["leaves"]], 
+                    mask=np.triu(np.ones_like(corr, dtype=bool)), 
+                    cmap=sns.diverging_palette(20, 220, as_cmap=True), 
+                    vmin=-0.75, vmax=0.75, center=0,
+                    square=True, linewidths=.3, annot=False, cbar_kws={"shrink": .6},
+                    ax=ax)
+        # ax.set_xticks(dendro_idx)
+        # ax.set_yticks(dendro_idx)
         ax.set_xticklabels(dendro["ivl"], rotation="vertical")
         ax.set_yticklabels(dendro["ivl"])
         fig.tight_layout()
