@@ -16,10 +16,8 @@ from src import functions as mlp
 df = pd.read_parquet('data/processed/data4ml_gauges.parquet') # gauges or bho
 df = df.loc[:, ~(df==0).all(axis=0)]
 df = df.drop(['code', 'g_area', 'g_lat', 'g_lon'], axis=1)
-df = df.drop(['cocursodag', 'cobacia', 'nucomptrec'], axis=1)
-df = df.drop(['lat', 'lon', 'L'], axis=1)
 
-mlp.plot_correlation_matrix(df)
+# mlp.plot_correlation_matrix(df)
 
 # Choose target
 targets = ['qm', 'q95'] # ['Wavg', 'Havg'] #
@@ -38,7 +36,8 @@ for target in targets:
         cluster_feature, selected_features = mlp.fs_hcluster(df,
                                                              features, 
                                                              target, 
-                                                             cluster_threshold=0.25, 
+                                                             cluster_threshold=0.4, 
+                                                             link_method='average',
                                                              plot=True)
     X = df[selected_features].values
     y = df[target].values
@@ -56,7 +55,7 @@ for target in targets:
         try:
             imps.columns = selected_features
             imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
-            # mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
+            mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
         except:
             0
         
@@ -65,7 +64,7 @@ for target in targets:
         dfr['obs'] = y
         dfr['pred'] = yhat
 
-        # dfr.to_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_'+method+'.parquet')
+        dfr.to_parquet('data/output/results_raw_'+target+'_'+mlmodel+'_'+method+'.parquet')
         
         
         
