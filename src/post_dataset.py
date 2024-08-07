@@ -9,14 +9,14 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
-dataset = pd.read_parquet('data/external/bho5k_trecho.parquet').set_index('cotrecho', drop=True).sort_index()
-dataset = dataset.dropna(subset='cocursodag')
-dataset = dataset[~(dataset.dsversao.str.startswith('BHO ilha'))]
-dataset = dataset[(dataset.cobacia.str.startswith('4')) | 
-                  ~(dataset.dedominial.isin(['Internacional', 'Linha de Costa']))]
-dataset = dataset[['cobacia', 'nuareamont']]
-dataset = dataset.rename(columns={'cobacia': 'code_otto', 'nuareamont': 'area_upst'})
-dataset.index.name = 'seg_id'
+base = pd.read_parquet('data/external/bho5k_trecho.parquet').set_index('cotrecho', drop=True).sort_index()
+base = base.dropna(subset='cocursodag')
+base = base[~(base.dsversao.str.startswith('BHO ilha'))]
+base = base[(base.cobacia.str.startswith('4')) | 
+            ~(base.dedominial.isin(['Internacional', 'Linha de Costa']))]
+base = base[['cobacia', 'nuareamont']]
+base = base.rename(columns={'cobacia': 'code_otto', 'nuareamont': 'area_upst'})
+base.index.name = 'seg_id'
 
 # Choose targets
 targets = ['qm', 'q95'] # ['Wavg', 'Havg'] # 
@@ -36,13 +36,13 @@ for target in targets:
     
     
     ### Process dataset
-    bho_r = pd.read_parquet('data/post/results_raw_'+target+'_'+mlmodel+'_dataset.parquet')
+    bho_r = pd.read_parquet('data/post/results_post_'+target+'_'+mlmodel+'_dataset.parquet')
     # bho_r.loc[dfr.index, 'pred'] = dfr.pred # Replace training predictions with k-fold predictions
     
+    dataset = base.copy()
     dataset['pred'] = bho_r.pred
-    dataset['pred'] = np.maximum(dataset.pred, 0)
-    
-    # dataset['pred'] = dataset.pred * dataset.nuareamont / 1000
+    dataset['ens_std'] = bho_r.ens_std
+    dataset['ens_cv'] = bho_r.ens_cv
     
     # Iterate through each column in the original DataFrame
     for column in params.columns:
@@ -65,6 +65,15 @@ for target in targets:
         gdf.to_parquet('data/post/bho_{}_{}_{}.parquet'.format(geom_type, target, mlmodel))
 
 
+### Process environmental descriptors dataset
+bho_d = pd.read_parquet('data/processed/data4ml_bho.parquet')
+bho_d = bho_d.drop(['code', 'g_area', 'g_lat', 'g_lon', 'qm', 'q95'], axis=1)
 
+dataset = base.join(bho_d)
 
+for geom_type in geom_types:
+    bho_geom = gpd.read_parquet('data/external/bho5k_{}.parquet'.format(geom_type),
+                                columns=['cotrecho', 'geometry']).set_index('cotrecho', drop=False).sort_index()
+    gdf = gpd.GeoDataFrame(dataset, geometry=bho_geom.geometry)
+    gdf.to_parquet('data/post/bho_{}_descriptors.parquet'.format(geom_type))
 

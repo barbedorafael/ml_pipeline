@@ -39,6 +39,15 @@ for target in targets:
                                                              cluster_threshold=0.4, 
                                                              link_method='average',
                                                              plot=True)
+    
+    # for c, fts in cluster_feature.items():
+    #     for f in fts:
+    #         if f in selected_features:
+    #             print(c)
+    #             print(fts)
+    #             print(f)
+    #             print('\n')
+
     X = df[selected_features].values
     y = df[target].values
     # y = np.maximum(y, 0.001) # No need because smallest value is 0.075
@@ -54,8 +63,9 @@ for target in targets:
         
         try:
             imps.columns = selected_features
-            imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
             mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
+            
+            # imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
         except:
             0
         

@@ -6,16 +6,17 @@ plt.style.use("seaborn-v0_8")
 
 # -------------- SETUP -------------- #
 b_plots = True
-compute_metrics = True
+compute_metrics = False
 suf = ""
 
 lst_models = [
-    "MLR",
-    "DT",
-    "KNN",
-    "SVM",
-    "GBM",
-    "RF"
+    # "MLR",
+    # "DT",
+    # "KNN",
+    # "SVM",
+    # "GBM",
+    # "RF",
+    "ensemble"
 ]
 
 lst_targets = ["qm", "q95"]
@@ -28,7 +29,10 @@ lst_rmse = []
 lst_bias = []
 for model in lst_models:
     for target in lst_targets:
-        f = "data/output/results_raw_{}_{}_k-fold.parquet".format(target, model)
+        if model=='ensemble':
+            f = "data/post/results_post_{}_{}_k-fold.parquet".format(target, model)
+        else:
+            f = "data/output/results_raw_{}_{}_k-fold.parquet".format(target, model)
         df = pd.read_parquet(f)
         obs_lbl = "obs"
         pred_lbl = "pred"
@@ -43,8 +47,8 @@ for model in lst_models:
 
         biv = Bivar(
             df_data=df,
-            x_name=obs_lbl,
-            y_name=pred_lbl,
+            x_name=pred_lbl,
+            y_name=obs_lbl,
             name="{}_{}{}".format(target, model, suf)
         )
 

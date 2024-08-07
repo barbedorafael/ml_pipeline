@@ -79,7 +79,7 @@ import seaborn as sns
 #     if savefig:
 #         f.savefig('docs/figures/correlation_matrix_all.png', dpi=300)
 
-def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False):
+def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False, savefig=False):
     """
     Perform feature selection based on hierarchical clustering and correlation analysis.
 
@@ -93,6 +93,7 @@ def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False
     cluster_feature (dict): Dictionaire containing the cluster with their respective features.
     selected_features (list): The selected feature for model running.
     """
+
     # Compute the correlation matrix
     dfcorr = df.corr(method='spearman')
     corr = dfcorr.loc[features, features].values
@@ -113,14 +114,32 @@ def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False
     for idx, cluster_id in enumerate(cluster_ids):
         cluster_id_to_feature_ids[cluster_id].append(idx)
         cluster_feature['Cluster '+str(cluster_id)].append(df.columns[idx])
-        
-    # Select features with the greatest correlation to the target
+
+    # Select the representative feature closest to the cluster mean
+    selected_features = []
+    for cluster_id, feature_ids in cluster_id_to_feature_ids.items():
+        cluster_dist = distance_matrix[feature_ids][:, feature_ids]
+        cluster_mean = cluster_dist.mean(axis=0)
+        closest_feature_idx = feature_ids[np.argmin(np.linalg.norm(cluster_dist - cluster_mean, axis=1))]
+        representative_feature = df.columns[closest_feature_idx]
+        selected_features.append(representative_feature)  
+
+    # Select feature with highest correlation within cluster
+    # selected_features = []
+    # for cluster_id, feature_ids in cluster_id_to_feature_ids.items():
+    #     cluster_dist = distance_matrix[feature_ids][:, feature_ids]
+    #     avg_corr = cluster_dist.mean(axis=1)
+    #     representative_feature_idx = feature_ids[np.argmin(avg_corr)]
+    #     representative_feature = df.columns[representative_feature_idx]
+    #     selected_features.append(representative_feature)
+    
     # abscorr = dfcorr.loc[features, features].abs()
     # selected_features = []
     # for feats in cluster_feature.values():
     #     corrout = abscorr[feats].drop(feats)
     #     print(corrout)
     
+    # Select features with the greatest correlation to the target
     abscorr = dfcorr.abs()
     selected_features = []
     for v in cluster_id_to_feature_ids.values():
@@ -131,10 +150,13 @@ def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False
     # Plot the correlation matrix and the dendogram
     if plot:
         
+        flabels = df[features].rename(columns=lambda x: f"{x.split('_')[0].upper()}$_{{{x.split('_')[1]}}}$").columns.tolist()
+        flabels = [f"{label}*" if label in selected_features else label for label in flabels]
+
         fig, ax = plt.subplots(1, 1, figsize=(6,8), dpi=300)
         dendro = hierarchy.dendrogram(
             dist_linkage,
-            labels=df[features].columns.tolist(),
+            labels=flabels,
             color_threshold=cluster_threshold,
             above_threshold_color='gray',
             ax=ax,
@@ -153,6 +175,9 @@ def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False
         for i, label in zip(dendro['leaves'], f_labels):
             label_text = label.get_text()
             label.set_color(leaf_colors[i])
+            if label_text.endswith('*'):
+                label.set_fontweight('bold')
+                label.set_color('red')  # Highlight representative feature in red
         
         ax.axvline(x=cluster_threshold, color='black', linestyle='--', label=f'Cluster Threshold')
         fig.tight_layout()
@@ -384,14 +409,16 @@ def model_run(X, y, mlmodel, method='kfold'):
     return yhat, imps
 
 def stats(pred, obs):
-    rq75 = np.percentile(np.maximum(abs(pred/obs), abs(obs/pred)), 75)
+    # rq75 = np.percentile(np.maximum(abs(pred/obs), abs(obs/pred)), 75)
     r2 = 1 - ((pred-obs)**2).sum()/((obs-obs.mean())**2).sum() # == nash
     rmse = ((pred - obs) ** 2).mean() ** .5
     bias = ((pred-obs).sum())/obs.sum() * 100
-    return {'rq75': rq75,
-            'r2': r2,
-            'rmse': rmse,
-            'bias': bias}
+    return {
+        # 'rq75': rq75,
+        'r2': r2,
+        'rmse': rmse,
+        'bias': bias
+        }
 
 def plot_results(yobs, ypred, imps, target, mlmodel, savefigs=False, folder='docs/figures/'):
     """    
