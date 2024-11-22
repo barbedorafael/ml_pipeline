@@ -17,11 +17,11 @@ cluster_feature, selected_features = mlp.feature_selection(df, target, cluster_t
 # Chose ML model 
 mlmodel = 'SVM' # 'MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF'
 y, result, imps = mlp.model_run(df,
-								selected_features,
-								target,
-								mlmodel,
-								method=method,
-								)
+				selected_features,
+				target,
+				mlmodel,
+				method=method,
+				)
 
 # Plot results
 mlp.plot_results(result, y, imps, target, mlmodel, savefigs=True)
