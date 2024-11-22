@@ -10,7 +10,7 @@ Created on Wed Nov 29 06:18:57 2023
 
 import numpy as np
 import pandas as pd
-from src import functions as mlp
+import functions as mlp
 
 
 df = pd.read_parquet('data/processed/data4ml_gauges.parquet') # gauges or bho
@@ -20,18 +20,17 @@ df = df.drop(['code', 'g_area', 'g_lat', 'g_lon'], axis=1)
 # mlp.plot_correlation_matrix(df)
 
 # Choose target
-targets = ['qm', 'q95'] # ['Wavg', 'Havg'] #
+targets = ['qm', 'q95']
 models = ['MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF']
 features = df.columns.drop(targets)
 
-df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKWK
+df = df.sample(frac = 1) # Shuffle values
 for target in targets:
     if df[target].isna().any():
         method = 'dataset'
         selected_features = features
     else:
         method = 'k-fold'
-        # method = 'loo'
         # Select features for modelling based on hyerarchical clustering
         cluster_feature, selected_features = mlp.fs_hcluster(df,
                                                              features, 
@@ -39,22 +38,12 @@ for target in targets:
                                                              cluster_threshold=0.4, 
                                                              link_method='average',
                                                              plot=True)
-    
-    # for c, fts in cluster_feature.items():
-    #     for f in fts:
-    #         if f in selected_features:
-    #             print(c)
-    #             print(fts)
-    #             print(f)
-    #             print('\n')
 
     X = df[selected_features].values
     y = df[target].values
-    # y = np.maximum(y, 0.001) # No need because smallest value is 0.075
     
     for mlmodel in models:
         print('Running for ' + target + ' and ' + mlmodel)
-        # y = np.log1p(y)
         yhat, imps = mlp.model_run(X,
                                   y,
                                   mlmodel,
@@ -65,7 +54,7 @@ for target in targets:
             imps.columns = selected_features
             mlp.plot_results(y, yhat, imps, target, mlmodel, savefigs=False)
             
-            # imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
+            imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
         except:
             0
         
