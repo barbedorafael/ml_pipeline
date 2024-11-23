@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.analyst import Bivar
+from src.results_vis.analyst import Bivar
 plt.style.use("seaborn-v0_8")
 
 # -------------- SETUP -------------- #
