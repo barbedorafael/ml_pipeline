@@ -79,7 +79,7 @@ target/
 data/*
 
 # Result visualization
-/src/result_vis/*
+/src/result_vis
 
 # Mac OS-specific storage files
 .DS_Store
