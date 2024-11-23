@@ -5,9 +5,6 @@ Created on Wed Nov 29 06:18:57 2023
 @author: RafBar
 """
 
-# import os
-# os.chdir('ml_pipeline')
-
 import numpy as np
 import pandas as pd
 import functions as mlp

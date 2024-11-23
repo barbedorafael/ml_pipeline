@@ -1,34 +1,15 @@
 # ML regression pipeline
 
-```python
-import pandas as pd
-import ml_pipeline.functions as mlp
+This repository contains the pipeline to generate a dataset containing mean and low reference flows for all Brazilian river stretches using Machine Learning models.
 
-df = pd.read_parquet('data/data4ml.parquet')
-df = df.sample(frac = 1) # Shuffle values MAKES ALL THE DIFFERENCE IDKW
+The attribution of the resulting variables was done using the BHO 5k [link]
 
-# Choose target (qm or q95)
-target = 'q95' # q95 or qm
+Another important input is gauged flows at specific stations with more than 20 years of data...
 
-# Select features for modelling based on hyerarchical clustering
-cluster_feature, selected_features = mlp.feature_selection(df, target, cluster_threshold=0.4, plot=False)
+The pipeline is processed in the following form:
 
+1. Feature data collection using Google Earth Engine Python API
+2. Data treatment using BHO topological information
+3. Processing and evaluation of six Machine Learning models
+4. Uncertainty estimation of the results
 
-# Chose ML model 
-mlmodel = 'SVM' # 'MLR', 'DT', 'KNN', 'SVM', 'GBM', 'RF'
-y, result, imps = mlp.model_run(df,
-				selected_features,
-				target,
-				mlmodel,
-				method=method,
-				)
-
-# Plot results
-mlp.plot_results(result, y, imps, target, mlmodel, savefigs=True)
-
-# Creating the DataFrame with specified columns and errors
-dfe = pd.DataFrame(index=df.index)
-dfe[target + '_obs'] = y
-dfe[target + '_pred'] = result
-dfe[target + '_error'] = y - result
-```
