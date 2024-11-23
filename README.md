@@ -4,9 +4,9 @@ This repository provides a machine learning pipeline designed to estimate **mean
 
 ---
 
-## Features
+## Steps
 - **Data Collection**: Uses the Google Earth Engine Python API to gather hydrological and environmental data.
-- **Data Processing**: Leverages topological information from the **Brazilian Hydrography Ontology (BHO)** for processing.
+- **Data Processing**: Leverages topological information from the **Brazilian Hydrography Ottocodified (BHO)** for processing.
 - **Machine Learning Models**: Evaluates six models to estimate river flow metrics.
 - **Uncertainty Estimation**: Quantifies the reliability of predictions.
 
