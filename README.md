@@ -4,32 +4,50 @@ This repository provides a machine learning pipeline designed to estimate **mean
 
 ---
 
-## Steps
-- **Data Collection**: Uses the Google Earth Engine Python API to gather hydrological and environmental data.
-- **Data Processing**: Leverages topological information from the **Brazilian Hydrography Ottocodified (BHO)** for processing.
-- **Machine Learning Models**: Evaluates six models to estimate river flow metrics.
-- **Uncertainty Estimation**: Quantifies the reliability of predictions.
+## Data Generation Workflow
+
+This section outlines how the dataset was generated. The steps below provide details about each part of the workflow.
+
+### Step 1: Data Collection
+- **Description**: Data was collected using the Google Earth Engine Python API to extract hydrological and environmental metrics for Brazilian river stretches.
+
+- **File**: `src/data_treatment/gee_data_extract.py`
+
+### Step 2: Data Pre-processing
+- **Description**: The raw data was processed using topological information from the Brazilian Hydrography Ottocodified (BHO) to generate features. Ran in the following order:
+
+- **1. Structure Flow data**: `src/data_treatment/org_flow.py`
+- **2. Aggregate all input data**: `src/data_treatment/agg_att.py`
+- **3. Aggregated attributes to catchment accumulated**: `src/data_treatment/acc_att.py`
+- **4. Structure All the data to be used by the ML models**: `src/data_treatment/to_ml.py`
+
+### Step 3: Model Processing
+- **Description**: Six ML models were processed. A K-fold CV was used at the gauging sites, and the all gauging data was used for all ungauged sites, for all models.
+
+- **File**: `src/process_modelig/model_run.py`
+
+### Step 4: Post-processing
+- **Description**: The trained model was evaluated, and performance metrics were saved.
+
+- **1. Evaluation of averaged ensemble combination**: `src/process_post/ens_eval.py`
+- **2. Processing of the best ensemble combination to all data**: `src/process_post/ens_run.py`
+- **3. Uncertainty estimation**: `src/process_post/unc_run.py`
+- **4. Final dataset production**: `src/process_post/data_gen.py`
 
 ---
 
 ## How to Use
 
-1. **Clone the Repository**:
+**Clone the Repository**:
     ```bash
     git clone https://github.com/barbedorafael/ml_pipeline.git
     cd ml_pipeline
     ```
 
-2. **Install Dependencies**:
+**Install Dependencies**:
     Install required libraries with:
     ```bash
     pip install -r requirements.txt
-    ```
-
-3. **Run the Pipeline**:
-    Modify the input parameters in `config.yaml` (or the relevant script) and execute:
-    ```bash
-    python src/main.py
     ```
 
 ---

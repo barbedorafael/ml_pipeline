@@ -17,7 +17,6 @@ centroids = subs.geometry.representative_point()
 lats = centroids.y.rename('lat')
 lons = centroids.x.rename('lon')
 
-
 def open_attribute_data(file):
     df = pd.read_csv(file, index_col='system:index')
     df = df.sort_values(by='cotrecho', ignore_index=True)

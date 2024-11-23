@@ -19,7 +19,7 @@ base = base.rename(columns={'cobacia': 'code_otto', 'nuareamont': 'area_upst'})
 base.index.name = 'seg_id'
 
 # Choose targets
-targets = ['qm', 'q95'] # ['Wavg', 'Havg'] # 
+targets = ['qm', 'q95']
 mlmodel = 'ensemble'
 geom_types = ['trecho', 'area']
 

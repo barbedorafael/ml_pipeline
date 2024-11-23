@@ -23,7 +23,7 @@ gaugelocs = gpd.read_file(data_dir + 'base_postos_ana.gpkg',
             include_fields=['codigo', 'area_km2', 'latitude', 'longitude']) # THIS INCLUDES MORE GAUGES THAN THE ONES USED
 
 subs = pd.merge(qdata.drop('geometry', axis=1), gaugelocs.drop('geometry', axis=1),
-                how='left', left_on='posto', right_on='codigo').drop('posto', axis=1) # THIS INCLUDES ALL BHO BUT DATA ONLY ON GAUGED SITES
+                how='left', left_on='posto', right_on='codigo').drop('posto', axis=1) # THIS INCLUDES ALL BHO BUT DATA ONLY AT GAUGED SITES
 
 subs = subs.rename({'codigo': 'code',
                     'p1_qmca': 'qm',
@@ -37,7 +37,7 @@ df_work = pd.merge(trecs.drop('geometry', axis=1), subs, on='cotrecho')
 
 gdf = gpd.GeoDataFrame(df_work, geometry=trecs.geometry)
 
-gdf.to_parquet('data/input/bho_flow_data.parquet')
+gdf.to_parquet('data/raw/bho_flow_data.parquet')
 
 ## Only gauges geom
 gauges = subs.dropna(subset='code')
