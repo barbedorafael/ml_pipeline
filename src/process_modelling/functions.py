@@ -125,13 +125,13 @@ def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False
         selected_features.append(representative_feature)  
 
     # Select feature with highest correlation within cluster
-    # selected_features = []
-    # for cluster_id, feature_ids in cluster_id_to_feature_ids.items():
-    #     cluster_dist = distance_matrix[feature_ids][:, feature_ids]
-    #     avg_corr = cluster_dist.mean(axis=1)
-    #     representative_feature_idx = feature_ids[np.argmin(avg_corr)]
-    #     representative_feature = df.columns[representative_feature_idx]
-    #     selected_features.append(representative_feature)
+    selected_features = []
+    for cluster_id, feature_ids in cluster_id_to_feature_ids.items():
+        cluster_dist = distance_matrix[feature_ids][:, feature_ids]
+        avg_corr = cluster_dist.mean(axis=1)
+        representative_feature_idx = feature_ids[np.argmin(avg_corr)]
+        representative_feature = df.columns[representative_feature_idx]
+        selected_features.append(representative_feature)
     
     # abscorr = dfcorr.loc[features, features].abs()
     # selected_features = []
@@ -140,12 +140,12 @@ def fs_hcluster(df, features, target, cluster_threshold, link_method, plot=False
     #     print(corrout)
     
     # Select features with the greatest correlation to the target
-    abscorr = dfcorr.abs()
-    selected_features = []
-    for v in cluster_id_to_feature_ids.values():
-        targetcorr = abscorr[target].iloc[v].max()
-        bestfeat = abscorr.reset_index().index[abscorr[target] == targetcorr].values[0]
-        selected_features.append(df.columns[bestfeat])
+    # abscorr = dfcorr.abs()
+    # selected_features = []
+    # for v in cluster_id_to_feature_ids.values():
+    #     targetcorr = abscorr[target].iloc[v].max()
+    #     bestfeat = abscorr.reset_index().index[abscorr[target] == targetcorr].values[0]
+    #     selected_features.append(df.columns[bestfeat])
         
     # Plot the correlation matrix and the dendogram
     if plot:
@@ -282,7 +282,7 @@ def kfold_cv(X, y, model, grid):
     n_splits = 10
     n_repeats = 10
     cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)  # Ensure reproducibility
-    yhat = np.zeros(y.size)
+    yhat = np.zeros(y.shape)
     imps = pd.DataFrame(columns=range(1, X.shape[1]+1), index=range(n_splits * n_repeats))
     i = 0
     
@@ -295,8 +295,6 @@ def kfold_cv(X, y, model, grid):
         i += n_repeats
 
     return yhat, imps
-
-
 
 def train_test(X, y, train_index, test_index, grid, model, n_repeats=10):
     X_train, X_test = X[train_index], X[test_index]
@@ -332,16 +330,22 @@ def train_test(X, y, train_index, test_index, grid, model, n_repeats=10):
             perm_importances = []
             for _ in range(n_repeats):  # Repeat N times
                 # Shuffle the feature
-                X_train_shuffled = X_train.copy()
-                X_test_shuffled = X_test.copy()
-                np.random.shuffle(X_train_shuffled[:, i])
-                np.random.shuffle(X_test_shuffled[:, i])
+                # X_train_new = X_train.copy()
+                # X_test_new = X_test.copy()
+                # np.random.shuffle(X_train_new[:, i])
+                # np.random.shuffle(X_test_new[:, i])
+
+                # Drop the feature
+                X_train_new = X_train.copy()
+                X_test_new = X_test.copy()
+                X_train_new = np.delete(X_train_new, i, axis=1)
+                X_test_new = np.delete(X_test_new, i, axis=1)
                 
                 # Retrain the model with the shuffled feature
-                model_opt.fit(X_train_shuffled, y_train)
-                y_pred_shuffled = model_opt.predict(X_test_shuffled)
-                shuffled_score = r2_score(y_test, y_pred_shuffled)
-                perm_importances.append(base_score - shuffled_score)
+                model_opt.fit(X_train_new, y_train)
+                y_pred_new = model_opt.predict(X_test_new)
+                new_score = r2_score(y_test, y_pred_new)
+                perm_importances.append(base_score - new_score)
             
             # Average the importance over N repeats
             pfi[:, i] = perm_importances

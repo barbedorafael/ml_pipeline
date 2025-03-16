@@ -7,7 +7,7 @@ Created on Wed Nov 29 06:18:57 2023
 
 import numpy as np
 import pandas as pd
-import functions as mlp
+import src.process_modelling.functions as mlp
 
 
 df = pd.read_parquet('data/processed/data4ml_gauges.parquet') # gauges or bho
