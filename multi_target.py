@@ -29,7 +29,7 @@ X = df[selected_features].values
 y = df[target].values
 
 
-mlmodel='RF'
+mlmodel='MLR'
 yhat, imps = mlp.model_run(X,
                             y,
                             mlmodel,
@@ -39,10 +39,13 @@ yhat, imps = mlp.model_run(X,
 imps.columns = selected_features
 
 
-p = 0.05  # e.g. want the flow at CDF=0.90
+p = 0.5  # e.g. want the flow at CDF=0.90
+# flow_pred = df['Q05'].values
 flow_obs = genextreme.ppf(p, y[:, 0], loc=y[:, 1], scale=y[:, 2])
 flow_pred = genextreme.ppf(p, yhat[:, 0], loc=yhat[:, 1], scale=yhat[:, 2])
 
 mlp.plot_results(flow_obs, flow_pred, imps, f'flow_{p}', mlmodel, savefigs=False)
+
+
     
 # imps.to_parquet('data/output/imps_'+target+'_'+mlmodel+'_'+method+'.parquet')
